@@ -83,7 +83,7 @@ struct CompanionView: View {
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: line?.time)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(playing ? "Mochi the cat dancing\(live ? " to Spotify’s audio" : " gently")" : "Mochi the cat resting")
-            .accessibilityValue(line?.text ?? "")
+            .accessibilityValue(playing ? (line?.text ?? "") : "")
         }
     }
 }
