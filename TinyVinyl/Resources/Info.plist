@@ -6,9 +6,10 @@
   <key>CFBundleName</key><string>Tiny Vinyl</string>
   <key>CFBundleDisplayName</key><string>Tiny Vinyl</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>0.2.0</string>
+  <key>CFBundleVersion</key><string>2</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSAppleEventsUsageDescription</key><string>Tiny Vinyl uses Spotify to show your current song and control play, pause, skipping, and volume.</string>
+  <key>NSAudioCaptureUsageDescription</key><string>Mochi reacts to the rhythm and energy of Spotify’s audio. Audio is analyzed only on this Mac, never recorded or uploaded. The microphone is not used.</string>
 </dict></plist>
