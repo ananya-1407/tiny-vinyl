@@ -4,6 +4,7 @@ import SwiftUI
 struct Playback: Decodable {
     var name: String = "Your next little obsession."
     var artist: String = "A home for whatever’s on repeat."
+    var album: String = ""
     var id: String = ""
     var artwork: String = ""
     var playing: Bool = false
@@ -39,12 +40,13 @@ enum SpotifyBridge {
     static let snapshot = """
     const s = Application('com.spotify.client');
     const state = s.playerState();
-    let p = {name:'Pick a song in Spotify', artist:'Your record is ready when you are.',
+    let p = {name:'Pick a song in Spotify', artist:'Mochi is ready when you are.', album:'',
       id:'', artwork:'', playing:state === 'playing', duration:0, position:0,
       volume:s.soundVolume(), shuffle:s.shuffling(), repeating:s.repeating()};
     try {
       const t = s.currentTrack();
       p.name = t.name() || p.name; p.artist = t.artist() || '';
+      p.album = t.album() || '';
       p.id = t.id() || ''; p.duration = Math.max(0, t.duration() / 1000);
       p.position = Math.max(0, s.playerPosition());
       try { p.artwork = t.artworkUrl() || ''; } catch (_) {}
@@ -85,6 +87,8 @@ enum SpotifyBridge {
 
 @MainActor
 final class PlayerModel: ObservableObject {
+    let beats = BeatListener()
+    let lyrics = LyricsModel()
     @Published var playback = Playback()
     @Published var artwork: NSImage?
     @Published var connected = false
@@ -110,6 +114,12 @@ final class PlayerModel: ObservableObject {
     private var lastTick = Date()
     private var nextReconnect = Date.distantPast
     private var permissionDenied = false
+    private var sampledAt = Date()
+
+    func position(at date: Date) -> Double {
+        let elapsed = playback.playing ? max(0, date.timeIntervalSince(sampledAt)) : 0
+        return min(playback.duration, max(0, playback.position + elapsed))
+    }
 
     var spotifyInstalled: Bool {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.spotify.client") != nil
@@ -121,9 +131,9 @@ final class PlayerModel: ObservableObject {
     var canUseTransport: Bool { (connected || preview || spotifyInstalled) && !busy }
     var status: String {
         if preview { return "DESIGN PREVIEW · NO AUDIO" }
-        if busy && !connected { return "GETTING THE RECORD READY" }
+        if busy && !connected { return "GETTING THE MUSIC READY" }
         if !connected { return "A LITTLE ROOM FOR MUSIC" }
-        return playback.playing ? "NOW SPINNING · SPOTIFY" : "TAKE YOUR TIME · PAUSED"
+        return playback.playing ? "VIBING TOGETHER · SPOTIFY" : "TAKE YOUR TIME · PAUSED"
     }
 
     func start() {
@@ -142,6 +152,8 @@ final class PlayerModel: ObservableObject {
         guard !busy else { return }
         if userInitiated { permissionDenied = false }
         generation += 1
+        beats.stop()
+        lyrics.update(nil)
         preview = false
         connected = false
         playback = Playback()
@@ -197,9 +209,11 @@ final class PlayerModel: ObservableObject {
         }
         if preview {
             if playback.playing { playback.position = min(playback.duration, playback.position + elapsed) }
+            sampledAt = now
             if playback.position >= playback.duration { demoSong(offset: 1) }
             return
         }
+        beats.update(playing: connected && playback.playing, preview: preview)
         guard !busy else { return }
         if !connected {
             // Reattach quietly when Spotify is reopened; don't keep reopening it
@@ -267,6 +281,8 @@ final class PlayerModel: ObservableObject {
     }
 
     func togglePreview() {
+        beats.stop()
+        lyrics.update(nil)
         generation += 1
         busy = false
         connected = false
@@ -285,6 +301,7 @@ final class PlayerModel: ObservableObject {
     }
 
     private func demoSong(offset: Int) {
+        sampledAt = Date()
         let songs = [("Midnight grooves", "Side A · The living room sessions"),
                      ("A slower kind of Sunday", "Side B · The living room sessions"),
                      ("Just one more record", "Side C · The living room sessions")]
@@ -295,8 +312,11 @@ final class PlayerModel: ObservableObject {
     }
 
     private func apply(_ value: Playback) {
+        sampledAt = Date()
         playback = value
         playback.position = min(playback.duration, max(0, playback.position))
+        lyrics.update(value.id.isEmpty ? nil : LyricsTrack(id: value.id, title: value.name, artist: value.artist,
+                                                         album: value.album, duration: Int(value.duration.rounded())))
         guard value.artwork != artworkURL else { return }
         artworkURL = value.artwork
         artwork = nil
@@ -311,7 +331,7 @@ final class PlayerModel: ObservableObject {
                       (response as? HTTPURLResponse)?.statusCode == 200,
                       data.count < 10_000_000, self.artworkURL == url.absoluteString else { return }
                 self.artwork = NSImage(data: data)
-            } catch { /* The printed label remains visible if artwork cannot load. */ }
+            } catch { /* Artwork is optional; playback and Mochi keep working. */ }
         }
     }
 
